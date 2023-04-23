@@ -1,98 +1,111 @@
-﻿
-
-$dllPath = "$($PWD.Path)\HDRController.dll".Replace("\", "\\")
-
-# Define the function signature
-Add-Type -TypeDefinition @"
-    using System.Runtime.InteropServices;
-
-    public static class HDRController {
-        [DllImport("$dllPath", EntryPoint = "GetGlobalHDRState")]
-        public static extern bool GetGlobalHDRState();
+param($async)
 
 
-        [DllImport("$dllPath", EntryPoint = "EnableGlobalHDRState")]
-        public static extern void EnableGlobalHDRState();
-
-        [DllImport("$dllPath", EntryPoint = "DisableGlobalHDRState")]
-        public static extern void DisableGlobalHDRState();
-    }
-"@
-
-# Call the function and store the result in a variable
-
-
-$script:hdrState = $false
-function OnStreamStart() {
-    $script:hdrState = [HDRController]::GetGlobalHDRState() 
-    Start-Sleep -Seconds 2
-    Write-Host "Current HDR State: $($script:hdrState)"
-    $log_path = If (IsSunshineUser) { "$env:WINDIR\Temp\sunshine.log" } Else { "$env:ProgramData\NVIDIA Corporation\NvStream\NvStreamerCurrent.log" }
-    $log_text = Get-Content  $log_path
-    $clientRes = $log_text | Select-String "video\[0\]\.dynamicRangeMode.*:\s?(?<hdr>\d+)" | Select-Object matches -ExpandProperty matches -Last 1
-
-    $hdrEnabled = $clientRes[0].Groups['hdr'].Value -eq 1
-
-    if($hdrEnabled){
-        Write-Host "Enabling HDR"
-        [HDRController]::EnableGlobalHDRState()
-    }
-    else {
-        [HDRController]::DisableGlobalHDRState()
-        Write-Host "Turning off HDR"
-    }
+# Since pre-commands in sunshine are synchronous, we'll launch this script again in another powershell process
+if ($null -eq $async) {
+    Start-Process powershell.exe  -ArgumentList "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`" $($MyInvocation.MyCommand.UnboundArguments) -async $true" -WindowStyle Hidden
+    Start-Sleep -Seconds 1
 }
 
-function OnStreamEnd() {
-    if($script:hdrState){
-        Write-Host "Enabling HDR"
-        [HDRController]::EnableGlobalHDRState()
-    }
-    else {
-        Write-Host "Turning off HDR"
-        [HDRController]::DisableGlobalHDRState()
-    }
+Set-Location (Split-Path $MyInvocation.MyCommand.Path -Parent)
+. .\HDRToggle-Functions.ps1
+$lock = $false
+Start-Transcript -Path .\log.txt
+
+
+$mutexName = "HDRToggle"
+$resolutionMutex = New-Object System.Threading.Mutex($false, $mutexName, [ref]$lock)
+
+# There is no need to have more than one of these scripts running.
+if (-not $resolutionMutex.WaitOne(0)) {
+    Write-Host "Another instance of the script is already running. Exiting..."
+    exit
 }
 
-function IsSunshineUser() {
-    return $null -ne (Get-Process sunshine -ErrorAction SilentlyContinue)
-}
-
-function IsCurrentlyStreaming() {
-    if (IsSunshineUser) {
-        return $null -ne (Get-NetUDPEndpoint -OwningProcess (Get-Process sunshine).Id -ErrorAction Ignore)
-    }
-
-    return $null -ne (Get-Process nvstreamer -ErrorAction SilentlyContinue)
-}
-
-function IsAboutToStartStreaming() {
-    # The difference with this function is that it checks to see if user recently queried the application list on the host.
-    # Useful in scenarios where a script must run prior to starting a stream.
-    # Sunshine already supports this functionaly, Geforce Experience does not.
-
-    $connectionDetected = & netstat -a -i -n | Select-String 47989 | Where-Object { $_ -like '*TIME_WAIT*' } 
-    [int] $duration = $connectionDetected -split " " | Where-Object { $_ } | Select-Object -Last 1
-    return $null -ne $connectionDetected -and $duration -lt 1500
-}
-
-# So that it doesn't immediately do the OnStreamEnd when user reboots
-$lastStreamed = [System.DateTime]::MinValue
-$onStreamStartEvent = $false
-while ($true) {
-    $streaming = IsCurrentlyStreaming
-
-    if ($streaming) {
+try {
+    
+    # Asynchronously start the Resolution Matcher, so we can use a named pipe to terminate it.
+    Start-Job -Name HDRToggleJob -ScriptBlock {
+        . .\MonitorSwap-Functions.ps1
         $lastStreamed = Get-Date
-        if (!$onStreamStartEvent) {
-            OnStreamStart
-            $onStreamStartEvent = $true
+
+
+        Register-EngineEvent -SourceIdentifier HDRToggle -Forward
+        New-Event -SourceIdentifier HDRToggle -MessageData "Start"
+        while ($true) {
+            if ((IsCurrentlyStreaming)) {
+                $lastStreamed = Get-Date
+            }
+            else {
+                if (((Get-Date) - $lastStreamed).TotalSeconds -gt 120) {
+                    Write-Output "Ending the stream script"
+                    New-Event -SourceIdentifier HDRToggle -MessageData "End"
+                    break;
+                }
+    
+            }
+            Start-Sleep -Seconds 1
+        }
+    
+    }
+
+
+    # To allow other powershell scripts to communicate to this one.
+    Start-Job -Name "HDRToggle-Pipe" -ScriptBlock {
+        $pipeName = "HDRToggle"
+        Remove-Item "\\.\pipe\$pipeName" -ErrorAction Ignore
+        $pipe = New-Object System.IO.Pipes.NamedPipeServerStream($pipeName, [System.IO.Pipes.PipeDirection]::In, 1, [System.IO.Pipes.PipeTransmissionMode]::Byte, [System.IO.Pipes.PipeOptions]::Asynchronous)
+
+        $streamReader = New-Object System.IO.StreamReader($pipe)
+        Write-Output "Waiting for named pipe to recieve kill command"
+        $pipe.WaitForConnection()
+
+        $message = $streamReader.ReadLine()
+        if ($message -eq "Terminate") {
+            Write-Output "Terminating pipe..."
+            $pipe.Dispose()
+            $streamReader.Dispose()
         }
     }
-    elseif ($onStreamStartEvent -and ((Get-Date) - $lastStreamed).TotalSeconds -gt 2) {
-        OnStreamEnd
-        $onStreamStartEvent = $false
-    }
 
-    Start-Sleep -Seconds 1
+
+
+    $eventMessageCount = 0
+    Write-Host "Waiting for the next event to be called... (for starting/ending stream)"
+    while ($true) {
+        $eventMessageCount += 1
+        Start-Sleep -Seconds 1
+        $eventFired = Get-Event -SourceIdentifier HDRToggle -ErrorAction SilentlyContinue
+        $pipeJob = Get-Job -Name "HDRToggle-Pipe"
+        if ($null -ne $eventFired) {
+            $eventName = $eventFired.MessageData
+            Write-Host "Processing event: $eventName"
+            if($eventName -eq "Start"){
+                OnStreamStart
+            }
+            elseif ($eventName -eq "End") {
+                OnStreamEnd
+                break;
+            }
+            Remove-Event -SourceIdentifier HDRToggle
+        }
+        elseif ($pipeJob.State -eq "Completed") {
+            Write-Host "Request to terminate has been processed, script will now revert back to previous HDR state."
+            OnStreamEnd
+            Remove-Job $pipeJob
+            break;
+        }
+        elseif($eventMessageCount -gt 59) {
+            Write-Host "Still waiting for the next event to fire..."
+            $eventMessageCount = 0
+        }
+
+    
+    }
+}
+finally {
+    Remove-Item "\\.\pipe\HDRToggle" -ErrorAction Ignore
+    $resolutionMutex.ReleaseMutex()
+    Remove-Event -SourceIdentifier HDRToggle -ErrorAction Ignore
+    Stop-Transcript
 }
