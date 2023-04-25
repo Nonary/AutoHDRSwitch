@@ -4,7 +4,7 @@ param($async)
 # Since pre-commands in sunshine are synchronous, we'll launch this script again in another powershell process
 if ($null -eq $async) {
     Start-Process powershell.exe  -ArgumentList "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`" $($MyInvocation.MyCommand.UnboundArguments) -async $true" -WindowStyle Hidden
-    Start-Sleep -Seconds 1
+    exit;
 }
 
 Set-Location (Split-Path $MyInvocation.MyCommand.Path -Parent)
@@ -13,24 +13,25 @@ $lock = $false
 Start-Transcript -Path .\log.txt
 
 
-$mutexName = "HDRToggle"
-$resolutionMutex = New-Object System.Threading.Mutex($false, $mutexName, [ref]$lock)
+$mutex = New-Object System.Threading.Mutex($false, "HDRToggle", [ref]$lock)
 
 # There is no need to have more than one of these scripts running.
-if (-not $resolutionMutex.WaitOne(0)) {
+if (-not $mutex.WaitOne(0)) {
     Write-Host "Another instance of the script is already running. Exiting..."
     exit
 }
 
 try {
     
-    # Asynchronously start the Resolution Matcher, so we can use a named pipe to terminate it.
+    # Asynchronously start the HDRToggle, so we can use a named pipe to terminate it.
     Start-Job -Name HDRToggleJob -ScriptBlock {
-        . .\MonitorSwap-Functions.ps1
+        . .\HDRToggle-Functions.ps1
         $lastStreamed = Get-Date
 
 
         Register-EngineEvent -SourceIdentifier HDRToggle -Forward
+        # Give enough time for Sunshine to write to the logs.
+        Start-Sleep -Seconds 2
         New-Event -SourceIdentifier HDRToggle -MessageData "Start"
         while ($true) {
             if ((IsCurrentlyStreaming)) {
@@ -105,7 +106,7 @@ try {
 }
 finally {
     Remove-Item "\\.\pipe\HDRToggle" -ErrorAction Ignore
-    $resolutionMutex.ReleaseMutex()
+    $mutex.ReleaseMutex()
     Remove-Event -SourceIdentifier HDRToggle -ErrorAction Ignore
     Stop-Transcript
 }
