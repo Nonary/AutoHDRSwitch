@@ -26,5 +26,5 @@ The HDR toggling code is from the following repositories:
 
 ## Installation:
 1. Store this folder in a location you intend to keep. If you delete this folder or move it, the automation will stop working.
-2. To install, right click the Install_as_Precommand.ps1 file and select "Run With Powershell".
-3. To uninstall, do the same thing with Uninstall_as_Precommand.ps1.
+2. To install, double click the Install.bat file. You may get a smart screen warning, this is normal.
+3. To uninstall, do the same thing with Uninstall.bat.
