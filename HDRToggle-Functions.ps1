@@ -107,7 +107,7 @@ function Stop-HDRToggleScript() {
     if ($pipeExists.Length -gt 0) {
         $pipeName = "HDRToggle"
         $pipe = New-Object System.IO.Pipes.NamedPipeClientStream(".", $pipeName, [System.IO.Pipes.PipeDirection]::Out)
-        $pipe.Connect()
+        $pipe.Connect(3)
         $streamWriter = New-Object System.IO.StreamWriter($pipe)
         $streamWriter.WriteLine("Terminate")
         try {
