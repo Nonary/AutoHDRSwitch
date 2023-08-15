@@ -1,14 +1,7 @@
 The pre-command version of this script is more "reactive", meaning it only runs when necessary. It also has a longer grace peroid during the suspension of a stream, 120 seconds, before reverting back. When ending a stream in Moonlight, it will revert back instantly.
 
-# PREREQUISITES
-
-If using Windows 11, make sure to set your default terminal to Windows Console Host, otherwise you will notice a PowerShell window minimized on your PC at all times.
-
 ## Requirements:
 - Host must be Windows
-- Sunshine must be installed as a service (it does not work with the zip version of Sunshine)
-- Sunshine logging level must be set to Debug
-- Users must have read permissions to %WINDIR%/Temp/Sunshine.log (do not change other permissions, just make sure Users have at least read permissions)
 - HDR Capable Display
 
 ## Caveats:

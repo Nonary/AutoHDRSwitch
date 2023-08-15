@@ -21,45 +21,12 @@ Add-Type -TypeDefinition @"
 
 # Call the function and store the result in a variable
 
-function Get-ClientHDRSetting() {
-    $log_path = "$env:WINDIR\Temp\sunshine.log" 
-
-
-    # Define regular expressions to match the height, width, and refresh rate values in the log file
-    $hdrRegex = [regex] "video\[0\]\.dynamicRangeMode.*:\s?(?<hdr>\d+)"
-
-    # Read the log file into an array of strings, split by newlines
-    $lines = Get-Content $log_path -ReadCount 0 | ForEach-Object { $_ -split "`n" }
-    
-    # Iterate through the array of strings in reverse order
-    for ($i = $lines.Length - 1; $i -ge 0; $i--) {
-        # Get the current line as a string
-        [string]$line = $lines[$i]
-
-        # Skip to the next line if the line doesn't start with "a=x"
-        # This is a performance optimization, this will match much faster than regular expressions.
-        if (-not $line.StartsWith("a=x")) {
-            continue;
-        }
-
-  
-        $hdrSettingMatch = $hdrRegex.Match($line)
-
-        if ($hdrSettingMatch.Success) {
-            return $hdrSettingMatch.Groups[1].Value -eq 1
-        }
-        
-
-    }
-
-    return $false
-}
 
 $script:hdrState = $false
-function OnStreamStart() {
+function OnStreamStart($hdrMode) {
     $script:hdrState = [HDRController]::GetGlobalHDRState() 
+    $clientHdrState = [System.Boolean]::Parse($hdrMode)
     Write-Host "Current (Host) HDR State: $($script:hdrState)"
-    $clientHdrState = Get-ClientHDRSetting
     Write-Host "Current (Client) HDR State: $clientHdrState"
 
     if ($script:hdrState -ne $clientHdrState) {
