@@ -1,24 +1,16 @@
 The pre-command version of this script is more "reactive", meaning it only runs when necessary. It also has a longer grace peroid during the suspension of a stream, 120 seconds, before reverting back. When ending a stream in Moonlight, it will revert back instantly.
 
-# PREREQUISITES
-
-If using Windows 11, make sure to set your default terminal to Windows Console Host, otherwise you will notice a PowerShell window minimized on your PC at all times.
-
 ## Requirements:
 - Host must be Windows
-- Sunshine must be installed as a service (it does not work with the zip version of Sunshine)
-- Sunshine logging level must be set to Debug
-- Users must have read permissions to %WINDIR%/Temp/Sunshine.log (do not change other permissions, just make sure Users have at least read permissions)
 - HDR Capable Display
+- Sunshine 0.21.0 or higher
 
 ## Caveats:
  - If using Windows 11, you'll need to set the default terminal to Windows Console Host as there is currently a bug in Windows Terminal that prevents hidden consoles from working properly.
     * That can be changed at Settings > Privacy & security > Security > For developers > Terminal [Let Windows decide] >> (change to) >> Terminal [Windows Console Host]
- - Prepcommands do not work from cold reboots, and will prevent Sunshine from working until you logon locally.
-   * You should add a new application (with any name you'd like) in the WebUI and leave **both** the command and detached command empty.
-   * When adding this new application, make sure global prep command option is disabled.
-   * That will serve as a fallback option when you have to remote into your computer from a cold start.
-   * Normal reboots issued from start menu, will still work without the workaround above as long as Settings > Accounts > Sign-in options and "Use my sign-in info to automatically finish setting up after an update" is enabled which is default in Windows 10 & 11.
+ - Due to Windows API restrictions, this script does not work on cold reboots (hard crashes or shutdowns of your computer).
+    * Fortunately recent changes to Sunshine makes this issue much easier to workaround.
+    * Simply sign into the computer using the "Desktop" app on Moonlight, then end the stream, then start it again to resolve issue in this scenario. 
  - The script will stop working if you move the folder, simply reinstall it to resolve that issue.
 
 ## What it Does:

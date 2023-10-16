@@ -6,8 +6,8 @@ if ($null -eq $async) {
     Start-Process powershell.exe  -ArgumentList "-ExecutionPolicy Bypass -File `"$($MyInvocation.MyCommand.Path)`" $($MyInvocation.MyCommand.UnboundArguments) -async $true" -WindowStyle Hidden
     exit;
 }
-
-Set-Location (Split-Path $MyInvocation.MyCommand.Path -Parent)
+$path = Split-Path $MyInvocation.MyCommand.Path -Parent
+Set-Location $path
 . .\HDRToggle-Functions.ps1
 $lock = $false
 Start-Transcript -Path .\log.txt
@@ -25,13 +25,13 @@ try {
     
     # Asynchronously start the HDRToggle, so we can use a named pipe to terminate it.
     Start-Job -Name HDRToggleJob -ScriptBlock {
+        param($path)
+        Set-Location $path
         . .\HDRToggle-Functions.ps1
         $lastStreamed = Get-Date
 
 
         Register-EngineEvent -SourceIdentifier HDRToggle -Forward
-        # Give enough time for Sunshine to write to the logs.
-        Start-Sleep -Seconds 2
         New-Event -SourceIdentifier HDRToggle -MessageData "Start"
         while ($true) {
             if ((IsCurrentlyStreaming)) {
@@ -48,7 +48,7 @@ try {
             Start-Sleep -Seconds 1
         }
     
-    }
+    } -ArgumentList $path
 
 
     # To allow other powershell scripts to communicate to this one.
@@ -81,8 +81,8 @@ try {
         if ($null -ne $eventFired) {
             $eventName = $eventFired.MessageData
             Write-Host "Processing event: $eventName"
-            if($eventName -eq "Start"){
-                OnStreamStart
+            if ($eventName -eq "Start") {
+                OnStreamStart -hdrMode $env:SUNSHINE_CLIENT_HDR
             }
             elseif ($eventName -eq "End") {
                 OnStreamEnd
@@ -96,7 +96,7 @@ try {
             Remove-Job $pipeJob
             break;
         }
-        elseif($eventMessageCount -gt 59) {
+        elseif ($eventMessageCount -gt 59) {
             Write-Host "Still waiting for the next event to fire..."
             $eventMessageCount = 0
         }
