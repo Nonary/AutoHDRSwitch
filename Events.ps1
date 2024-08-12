@@ -40,10 +40,6 @@ Add-Type -TypeDefinition @"
 
 # Function to execute at the start of a stream
 function OnStreamStart() {
-    Write-Host "Stream started!"
-    Write-Debug "Optional Debug Message"
-    # Add a new key-value pair to the dictionary, demonstrating parameter storage for future retrieval
-    $script:arguments.Add("Message", "This is an example of retrieving parameters in the future")
     $hostHDR = [HDRController]::GetGlobalHDRState()
 
     $script:arguments.Add("hostHDR", $hostHDR)
@@ -63,15 +59,14 @@ function OnStreamStart() {
     }
     
     if($settings.IDDSampleFix){
-        if($hostHDR -and $clientHdrState){
+        if([HDRController]::GetGlobalHDRState() -and $clientHdrState){
             Write-Host "IDDSample Fix is enabled, now automating turning HDR off and on again."
             [HDRController]::DisableGlobalHDRState()
             [HDRController]::EnableGlobalHDRState()
             Write-Host "HDR has been toggled successfully!"
         }
     }
-
-    if($hostHDR -eq $clientHdrState) {
+    elseif($hostHDR -eq $clientHdrState) {
         Write-Host "Client already matches the host for HDR, no changes will be applied."
     }
 }
