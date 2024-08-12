@@ -64,8 +64,10 @@ function OnStreamStart() {
     
     if($settings.IDDSampleFix){
         if($hostHDR -and $clientHdrState){
+            Write-Host "IDDSample Fix is enabled, now automating turning HDR off and on again."
             [HDRController]::DisableGlobalHDRState()
             [HDRController]::EnableGlobalHDRState()
+            Write-Host "HDR has been toggled successfully!"
         }
     }
 
