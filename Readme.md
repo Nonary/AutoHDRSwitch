@@ -1,5 +1,3 @@
-The pre-command version of this script is more "reactive", meaning it only runs when necessary. It also has a longer grace peroid during the suspension of a stream, 120 seconds, before reverting back. When ending a stream in Moonlight, it will revert back instantly.
-
 ## Requirements:
 - Host must be Windows
 - HDR Capable Display
@@ -17,6 +15,8 @@ The pre-command version of this script is more "reactive", meaning it only runs 
 Checks to see if the last connected Moonlight client asked for HDR, if so, it will enable HDR. Otherwise, it will disable it.
 Once the stream ends, it will configure the last HDR setting prior to starting the stream.
 
+(Optionally) If enabled, will toggle HDR on and off automatically to fix issues with the IDDSampleDriver on overblown colors when streaming in HDR.
+
 ## Credits:
 The HDR toggling code is from the following repositories:
 - https://github.com/Codectory/AutoActions - The original developer of the HDR toggle code that made calling the DLL possible.
@@ -24,5 +24,6 @@ The HDR toggling code is from the following repositories:
 
 ## Installation:
 1. Store this folder in a location you intend to keep. If you delete this folder or move it, the automation will stop working.
-2. To install, double click the Install.bat file. You may get a smart screen warning, this is normal.
-3. To uninstall, do the same thing with Uninstall.bat.
+2. If you intend on using IDDSampleDriver, which has known issues with HDR you should enable the "IDDSampleFix" setting located in the settings.json file.
+3. To install, double click the Install.bat file. You may get a smart screen warning, this is normal.
+4. To uninstall, do the same thing with Uninstall.bat.
