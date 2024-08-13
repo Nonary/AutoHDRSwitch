@@ -27,3 +27,7 @@ The HDR toggling code is from the following repositories:
 2. If you intend on using IDDSampleDriver, which has known issues with HDR you should enable the "IDDSampleFix" setting located in the settings.json file.
 3. To install, double click the Install.bat file. You may get a smart screen warning, this is normal.
 4. To uninstall, do the same thing with Uninstall.bat.
+
+### Recent Changes
+- Migrated to [Sunshine Script Installer Template](https://github.com/Nonary/SunshineScriptInstaller)
+- Added new option for fixing HDR issues on IDDSampleDriver displays.
