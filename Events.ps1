@@ -43,7 +43,7 @@ function OnStreamStart() {
     $hostHDR = [HDRController]::GetGlobalHDRState()
 
     $script:arguments.Add("hostHDR", $hostHDR)
-    $clientHdrState = $env:SUNSHINE_CLIENT_HDR
+    $clientHdrState = [System.Boolean]::Parse($env:SUNSHINE_CLIENT_HDR)
     Write-Host "Current (Host) HDR State: $hostHDR"
     Write-Host "Current (Client) HDR State: $clientHdrState"
 
